@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">" CarbotControll"</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="Mobile_control">Mobile Control</string>
+    <string name="bounded_devices">Bounded Devices</string>
+    <string name="discovered_devices">Discovered Devices</string>
+</resources>
