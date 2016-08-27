@@ -1,42 +1,51 @@
 package hk.hku.makerlarb.carbotcontroll.carbotcontroll;
 
+import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.os.Build;
+import android.os.Handler;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.support.v7.view.menu.ExpandedMenuView;
 import android.util.Log;
-import android.view.animation.Animation;
-import android.view.animation.AnimationUtils;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.MotionEvent;
+import android.view.View;
 import android.widget.CompoundButton;
-import android.widget.ImageView;
+import android.widget.ImageButton;
 
-import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
 import android.content.Intent;
 import android.widget.Switch;
-
+import android.widget.Toast;
 
 import java.io.IOException;
 
+import hk.hku.makerlarb.carbotcontroll.Manifest;
 import hk.hku.makerlarb.carbotcontroll.R;
 
+public class MainActivity extends AppCompatActivity implements SensorEventListener {
 
-public class MainActivity extends AppCompatActivity implements SensorEventListener{
-
-    private BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
     private SensorManager sensorManager = null;
     private Sensor sensor;
 
-    private float[] angles = new float[3];
-
-    private static final int left = 0, right = 1, stand = 2, back = 3;
+    private static final int stand = 0, left = 1, right = 2, forward = 3, back = 4;
     private int state = stand;
+    private int stateBefore = state;
+    private boolean pressedState = false;
+    private final static int permissionState = 0;
+    private boolean permitted = false;
 
-    ImageView shadowImg;
-    Animation shadow;
+    private static Handler handler = new Handler();
+    private static Thread thread = new Thread();
+
+    private ImageButton controlButton;
+    private int count = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,11 +53,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        shadowImg = (ImageView) findViewById(R.id.shadow);
-        shadow = AnimationUtils.loadAnimation(this, R.anim.upward);
-        shadow.start();
-
-        sensorManager = (SensorManager)getSystemService(Context.SENSOR_SERVICE);
+        controlButton = (ImageButton)findViewById(R.id.controlButton);
+        controlButton.setOnTouchListener(controlListener);
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         sensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
 
         switchChanged();
@@ -59,7 +66,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     protected void onDestroy() {
         sensorManager.unregisterListener(this);
 
-        if(BluetoothActivity.socket.isConnected()){
+        if (BluetoothActivity.socket.isConnected()) {
             try {
                 BluetoothActivity.socket.close();
             } catch (IOException e) {
@@ -70,39 +77,59 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onDestroy();
     }
 
-    public void switchChanged(){
+    @Override
+    protected  void onRestart(){
+        super.onRestart();
+    }
 
-        Switch controlSwitch = (Switch) findViewById(R.id.switch_button);
+    public void switchChanged() {
+
+        final Switch controlSwitch = (Switch) findViewById(R.id.switch_button);
         controlSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton compoundButton, boolean ischecked) {
+                final boolean checked = ischecked;
 
-                if (ischecked) {
-                    if(!adapter.isEnabled()){
-                        adapter.enable();
+                    if (BluetoothActivity.socket != null) {
+                        if (BluetoothActivity.socket.isConnected()) {
+                            Thread cmdthread = new Thread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    handler.postDelayed(new Runnable() {
+
+                                        @Override
+                                        public void run() {
+                                                try {
+                                                    byte[] cmd = {'g'};
+                                                    if(checked){
+                                                        cmd[0] = 'f';
+                                                    }
+                                                    BluetoothActivity.os.write(cmd);
+                                                    BluetoothActivity.os.flush();
+                                                    sleep(150);
+                                                } catch (Exception e) {
+                                                    Log.i("Error: ", e.toString());
+                                                }
+                                            }
+
+                                    }, 150);
+                                }
+                            });
+                            cmdthread.run();
+                        }
                     }
-
-                    Intent enable = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
-                    enable.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 3600);
-                    startActivity(enable);
-
-                    Intent intent = new Intent(MainActivity.this, BluetoothActivity.class);
-                    startActivity(intent);
-                } else {
-                    disableBluetooth();
                 }
-            }
+
+
         });
 
     }
 
-    private void disableBluetooth() {
-
-    }
 
     @Override
-    protected void onPostResume(){
-            super.onPostResume();
+    protected void onPostResume() {
+
+        super.onPostResume();
         sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL);
     }
 
@@ -110,67 +137,176 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
 
-        int stateBefore = state;
-        if(sensorEvent.sensor.getType() == Sensor.TYPE_ACCELEROMETER)
-        {
-            if(sensorEvent.values[0] > 2){
-                state = left;
-            }else if(sensorEvent.values[0] < -2){
-                state = right;
+        if(pressedState){
+            stateBefore = state;
+            if (sensorEvent.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+                if (sensorEvent.values[0] > 2) {
+                    state = left;
+                } else if (sensorEvent.values[0] < -2) {
+                    state = right;
+                } else if (sensorEvent.values[1] > 1) {
+                    state = back;
+                } else if(sensorEvent.values[1] < -1){
+                    state = forward;
+                }
             }
 
-            if(sensorEvent.values[1] > 2){
-                state = back;
-            }else {
-                state = stand;
-             }
+
+            if (BluetoothActivity.socket != null) {
+                if (BluetoothActivity.socket.isConnected()) {
+                    thread = new Thread(new Runnable() {
+
+                    @Override
+                    public void run() {
+                            handler.postDelayed(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                    try {
+                                        byte[] cmd = {'f'};
+                                        switch (state) {
+                                            case left:
+                                                if(stateBefore == left){
+                                                    count ++;
+                                                }else{
+                                                    count = 0;
+                                                }
+                                                if(count %3 == 0){
+                                                    cmd[0] = 'b';
+
+                                                    BluetoothActivity.os.write(cmd);
+                                                    BluetoothActivity.os.flush();
+
+                                                    sleep(150);
+
+                                                    Log.i("Direction : ", "Left");
+                                                }
+
+                                                break;
+
+                                            case right:
+                                                if(stateBefore == right){
+                                                    count ++;
+                                                }else{
+                                                    count = 0;
+                                                }
+                                                if(count % 3 == 0){
+                                                    cmd[0] = 'd';
+
+                                                    BluetoothActivity.os.write(cmd);
+                                                    BluetoothActivity.os.flush();
+
+                                                    sleep(150);
+
+                                                    Log.i("Direction : ", "Right");
+                                                }
+
+                                                break;
+
+                                            case back:
+                                                if(stateBefore == right){
+                                                    count ++;
+                                                }else{
+                                                    count = 0;
+                                                }
+                                                if(count % 3 == 0){
+                                                    cmd[0] = 'e';
+
+                                                    BluetoothActivity.os.write(cmd);
+                                                    BluetoothActivity.os.flush();
+
+                                                    sleep(150);
+
+                                                    BluetoothActivity.os.write(cmd);
+                                                    BluetoothActivity.os.flush();
+
+                                                    Log.i("Direction : ", "Back");
+                                                }
+                                                break;
+
+                                            case forward:
+                                                if(stateBefore == right){
+                                                    count ++;
+                                                }else{
+                                                    count = 0;
+                                                }
+                                                if(count % 3 == 0){
+                                                    cmd[0] = 'a';
+
+                                                    BluetoothActivity.os.write(cmd);
+                                                    BluetoothActivity.os.flush();
+
+                                                    sleep(150);
+
+                                                    BluetoothActivity.os.write(cmd);
+                                                    BluetoothActivity.os.flush();
+                                                    Log.i("Direction : ", "Forward");
+                                                }
+
+                                                break;
+
+                                        }
+
+                                    } catch (Exception e) {
+                                        Log.i("Error: ", e.toString());
+                                    }
+                                }
+                        }, 150);
+
+                        }
+                    });
+                }
+              }
+            }
+
+
+        else{
+            if (BluetoothActivity.socket != null) {
+                if (BluetoothActivity.socket.isConnected()) {
+
+                        thread = new Thread(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                handler.postDelayed(new Runnable() {
+
+                                    @Override
+                                    public void run() {
+                                        if(stateBefore != stand){
+                                        try {
+                                            count = 0;
+                                            byte[] cmd = {'c'};
+                                            BluetoothActivity.os.write(cmd);
+                                            BluetoothActivity.os.flush();
+
+                                            sleep(150);
+
+                                            Log.i("Direction : ", "Stand");
+
+                                            stateBefore =  stand;
+                                        } catch (Exception e) {
+                                            Log.i("Error: ", e.toString());
+                                        }
+                                    }
+                                    }
+                                }, 150);
+                            }
+                        });
+
+                }
+            }
         }
 
+        if(thread.isAlive()){
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }else{
+            thread.run();
+        }
 
-//        if(stateBefore != state){
-
-                if(BluetoothActivity.os != null){
-                    try{
-                    byte[] cmd = {'c'};
-                    switch (state){
-                        case left:
-                            cmd[0] = 'b';
-                            BluetoothActivity.os.write(cmd);
-
-                            shadow = AnimationUtils.loadAnimation(this, R.anim.left);
-                            if(shadow.hasEnded())
-                              shadow.start();
-                            break;
-                        case right:
-                            cmd[0] = 'd';
-                            BluetoothActivity.os.write(cmd);
-                            shadow = AnimationUtils.loadAnimation(this, R.anim.right);
-                            if(shadow.hasEnded())
-                               shadow.start();
-                            break;
-                        case back:
-                            cmd[0] = 'e';
-                            BluetoothActivity.os.write(cmd);
-                            shadow = AnimationUtils.loadAnimation(this, R.anim.downward);
-                            if(shadow.hasEnded())
-                                shadow.start();
-                            break;
-                        case stand:
-                            cmd[0] = 'a';
-                            BluetoothActivity.os.write(cmd);
-                            shadow = AnimationUtils.loadAnimation(this, R.anim.upward);
-                            if(shadow.hasEnded())
-                                shadow.start();
-                            break;
-                    }
-
-                    BluetoothActivity.os.flush();
-                }catch (Exception e){
-                    Log.i("Error: ", e.toString());
-                }
-                }
-
-//        }
 
     }
 
@@ -178,6 +314,76 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void onAccuracyChanged(Sensor sensor, int i) {
 
     }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu){
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item){
+
+            if(Build.VERSION.SDK_INT >= 23){
+                if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_ADMIN) !=
+                        PackageManager.PERMISSION_GRANTED){
+                    ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.BLUETOOTH_ADMIN}, permissionState);
+                    ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, Manifest.permission.BLUETOOTH_ADMIN);
+                }
+            }else{
+                permitted = true;
+            }
+
+            if(permitted){
+                Intent intent = new Intent(MainActivity.this, BluetoothActivity.class);
+                startActivity(intent);
+            }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] Permissions, int[] grantResults){
+        switch(requestCode){
+            case permissionState:
+                if(grantResults[0] == PackageManager.PERMISSION_GRANTED){
+                    permitted = true;
+                }else{
+                    Toast.makeText(MainActivity.this, "Permission Denied", Toast.LENGTH_SHORT).show();
+                }
+                break;
+            default:
+                super.onRequestPermissionsResult(requestCode, Permissions, grantResults);
+        }
+    }
+
+    private void sleep(long ms){
+        try{
+            Thread.sleep(ms, 0);
+        }catch (Exception e){
+            Log.i("Thread Exception", e.toString());
+        }
+    }
+
+
+    private View.OnTouchListener controlListener = new View.OnTouchListener() {
+
+        @Override
+        public boolean onTouch(View view, MotionEvent motionEvent) {
+            switch (motionEvent.getAction()){
+                case MotionEvent.ACTION_DOWN:
+                    pressedState = true;
+                    break;
+                case MotionEvent.ACTION_UP:
+                    pressedState = false;
+                    break;
+            }
+
+            return true;
+        }
+    };
 
 
 }

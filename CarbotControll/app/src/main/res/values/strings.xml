@@ -6,4 +6,5 @@
     <string name="Mobile_control">Mobile Control</string>
     <string name="bounded_devices">Bounded Devices</string>
     <string name="discovered_devices">Discovered Devices</string>
+    <string name="menu_option">Connect Bluetooth</string>
 </resources>

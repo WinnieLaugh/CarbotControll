@@ -15,7 +15,6 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
-import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Set;
@@ -29,7 +28,8 @@ import hk.hku.makerlarb.carbotcontroll.models.Bluetooth;
 public class BluetoothActivity extends FragmentActivity implements BltItemClickListener{
 
     private UUID SerialUUID;
-    private static String DEFAULT_ADDRESS = "00:BA:55:57:53:F8";
+    private static String DEFAULT_ADDRESS = "00:BA:55:57:17:D4";
+    private static String addressToConnect = DEFAULT_ADDRESS;
 
     private ArrayList<Bluetooth> bondedList = new ArrayList<>();
     private ArrayList<Bluetooth> discoveredList = new ArrayList<>();
@@ -55,9 +55,10 @@ public class BluetoothActivity extends FragmentActivity implements BltItemClickL
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_bluetooth);
-
         pairedView = (RecyclerView)findViewById(R.id.bluetooth_paired_list);
         discoveredView = (RecyclerView)findViewById(R.id.bluetooth_unpaired_list);
+
+        enableBluetooth();
 
         discoveredView.setLayoutManager(new LinearLayoutManager(this));
         receiver = new BroadcastReceiver() {
@@ -68,7 +69,7 @@ public class BluetoothActivity extends FragmentActivity implements BltItemClickL
                 Log.i("Bluetooth action","BluetoothReceiver action = " + action);
 
                 if(BluetoothDevice.ACTION_FOUND.equals(action)){
-                    BluetoothDevice scanDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    final BluetoothDevice scanDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                     if(scanDevice == null || scanDevice.getName() == null)
                         return;
 
@@ -79,9 +80,14 @@ public class BluetoothActivity extends FragmentActivity implements BltItemClickL
                     BluetoothActivity.this.runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            discoveredList.add(new Bluetooth(scanDeviceName, scanDeviceAddress));
-                            discoveredBltDeviceAdapter.notifyDataSetChanged();
-                        }
+
+                            for(int i=0; i <bondedList.size(); i++){
+                                if(scanDeviceName.equals(bondedList.get(i).getName())){
+                                    discoveredList.add(new Bluetooth(scanDeviceName, scanDeviceAddress));
+                                    discoveredBltDeviceAdapter.notifyDataSetChanged();
+                                }
+                            }
+                       }
                     });
 
                 }else if(BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)){
@@ -96,9 +102,6 @@ public class BluetoothActivity extends FragmentActivity implements BltItemClickL
         discoveredBltDeviceAdapter = new BluetoothDeviceAdapter(this, discoveredList);
         discoveredView.setAdapter(discoveredBltDeviceAdapter);
 
-
-        enableBluetooth();
-
         bluetoothAdapter.startDiscovery();
 
         IntentFilter filter = new IntentFilter();
@@ -108,86 +111,11 @@ public class BluetoothActivity extends FragmentActivity implements BltItemClickL
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         registerReceiver(receiver, filter);
 
-         thread = new Thread(new Runnable() {
-
-
-            @Override
-            public void run() {
-
-                bluetoothAdapter.cancelDiscovery();
-
-                    deviceDestinated = bluetoothAdapter.getRemoteDevice(DEFAULT_ADDRESS);
-
-                SerialUUID = deviceDestinated.getUuids()[0].getUuid();
-
-                if(deviceDestinated.getBondState() == BluetoothDevice.BOND_NONE){
-                    try{
-                        socket = deviceDestinated.createRfcommSocketToServiceRecord(SerialUUID);
-                    }catch (Exception e){
-                    }
-                }else{
-                    Log.i("Connection :", "Connected Already!");
-                }
-
-                try{
-                    socket = deviceDestinated.createRfcommSocketToServiceRecord(SerialUUID);
-                    socket.connect();
-
-                }catch (Exception e){
-                    Log.w("Error", e.toString());
-
-                    try{
-                        Log.e("", "trying fallback...");
-
-                        socket = (BluetoothSocket)deviceDestinated.getClass().getMethod("createRfcommSocket", new Class[]{int.class}).invoke(deviceDestinated,1);
-                        socket.close();
-                    } catch (Exception e1) {
-                        e1.printStackTrace();
-                    }
-                }
-
-
-
-
-                try{
-                    if(socket.isConnected()){
-                        Log.i("Connected socket","Yes, Connected");
-                    }else{
-                        Log.i("Connected socket","No,Not Connected");
-                        socket.connect();
-                    }
-
-                        os = socket.getOutputStream();
-                        byte[] b = {'f'};
-                        os.write(b);
-                        os.flush();
-
-                }catch (Exception e){
-                    Log.w("Error", e.toString());
-                    try{
-                        socket.close();
-                        socket = null;
-                    }catch (Exception closeException){
-                        Toast.makeText(BluetoothActivity.this, "Unable to close socket during connection failure", Toast.LENGTH_SHORT).show();;
-                    }
-                }
-
-            }
-        });
-
     }
 
     @Override
     protected void onDestroy(){
         thread.interrupt();
-//        if(socket.isConnected()){
-//            try {
-//                socket.close();
-//            } catch (IOException e) {
-//
-//                e.printStackTrace();
-//            }
-//        }
 
         unregisterReceiver(receiver);
 
@@ -225,17 +153,87 @@ public class BluetoothActivity extends FragmentActivity implements BltItemClickL
     @Override
     public void OnItemClick(View view, final int position) {
 
-        final String addressDestinated = bondedList.get(position).getAddress();
-        final String nameDestinated = bondedList.get(position).getName();
-
-//        if(bluetoothAdapter.getBondedDevices())
-
-        thread.run();
-        
-        Intent intent = new Intent(BluetoothActivity.this, MainActivity.class);
-        startActivity(intent);
+        addressToConnect = bondedList.get(position).getAddress();
 
 
+        thread = new Thread(new Runnable() {
+
+
+            @Override
+            public void run() {
+
+                bluetoothAdapter.cancelDiscovery();
+
+                deviceDestinated = bluetoothAdapter.getRemoteDevice(addressToConnect);
+
+                SerialUUID = deviceDestinated.getUuids()[0].getUuid();
+
+
+                while(socket == null ){
+                    try{
+                        socket = deviceDestinated.createRfcommSocketToServiceRecord(SerialUUID);
+                    }catch (Exception e){
+                        Log.w("Error", e.toString());
+                    }
+                }
+
+                try{
+                    if(socket.isConnected()){
+                        Log.i("Connected socket","Yes, Connected");
+                    }else{
+                        Log.i("Connected socket","No,Not Connected");
+                        try{
+                            socket.connect();
+                        }catch (Exception e){
+                            Log.w("Error", e.toString());
+
+                            try{
+                                Log.e("", "trying fallback...");
+
+                                socket = (BluetoothSocket)deviceDestinated.getClass().getMethod("createRfcommSocket", new Class[]{int.class}).invoke(deviceDestinated,1);
+                                socket.close();
+                            } catch (Exception e1) {
+                                e1.printStackTrace();
+                            }
+                        }
+                    }
+
+                    os = socket.getOutputStream();
+
+                }catch (Exception e){
+                    Log.w("Error", e.toString());
+                    try{
+                        socket.close();
+                        socket = null;
+                    }catch (Exception closeException){
+                        Toast.makeText(BluetoothActivity.this, "Unable to close socket during connection failure", Toast.LENGTH_SHORT).show();;
+                    }
+                }
+
+            }
+        });
+
+
+        if(socket != null){
+            try{
+                thread.join();
+            }catch (Exception e){
+                Log.i("thread Exception", e.toString());
+            }
+
+        }else{
+            thread.run();
+        }
+
+
+        if(socket != null){
+            if(socket.isConnected()){
+
+                Intent intent = new Intent(BluetoothActivity.this, MainActivity.class);
+                startActivity(intent);
+
+            }
+        }
 
     }
 }
