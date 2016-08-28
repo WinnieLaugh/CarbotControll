@@ -9,28 +9,38 @@
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:orientation="vertical">
 
-    <LinearLayout
-        android:layout_width="wrap_content"
+
+    <GridLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:useDefaultMargins="true"
+        android:layout_marginTop="@dimen/text_margin"
         android:orientation="horizontal"
-        android:layout_gravity="top|right">
+        android:rowCount="1"
+        android:columnCount="3">
+
+        <Button
+            android:id="@+id/bluetooth_connect"
+            android:layout_column="0"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_option"
+            android:textColor="#4871A8" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/Mobile_control"
             android:textColor="#4871A8"
-            android:textSize="@dimen/activity_horizontal_margin"/>
+            android:layout_gravity="right"/>
 
         <Switch
             android:id="@+id/switch_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingLeft="@dimen/activity_horizontal_margin"
             android:textOff="off"
-
             android:textOn="on" />
-    </LinearLayout>
+    </GridLayout>
 
 
 

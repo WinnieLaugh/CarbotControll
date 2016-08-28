@@ -16,6 +16,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.ImageButton;
 
@@ -45,6 +46,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private static Thread thread = new Thread();
 
     private ImageButton controlButton;
+    private Button bluetoothButton;
     private int count = 0;
 
     @Override
@@ -55,8 +57,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         controlButton = (ImageButton)findViewById(R.id.controlButton);
         controlButton.setOnTouchListener(controlListener);
+
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         sensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+
+        bluetoothButton = (Button)findViewById(R.id.bluetooth_connect);
+        bluetoothButton.setOnClickListener(bluetoothConnect);
 
         switchChanged();
 
@@ -125,7 +131,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     }
 
-
     @Override
     protected void onPostResume() {
 
@@ -166,12 +171,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                                         byte[] cmd = {'f'};
                                         switch (state) {
                                             case left:
-                                                if(stateBefore == left){
-                                                    count ++;
-                                                }else{
-                                                    count = 0;
-                                                }
-                                                if(count %3 == 0){
                                                     cmd[0] = 'b';
 
                                                     BluetoothActivity.os.write(cmd);
@@ -180,17 +179,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                                                     sleep(150);
 
                                                     Log.i("Direction : ", "Left");
-                                                }
 
                                                 break;
 
                                             case right:
-                                                if(stateBefore == right){
-                                                    count ++;
-                                                }else{
-                                                    count = 0;
-                                                }
-                                                if(count % 3 == 0){
+
                                                     cmd[0] = 'd';
 
                                                     BluetoothActivity.os.write(cmd);
@@ -199,7 +192,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                                                     sleep(150);
 
                                                     Log.i("Direction : ", "Right");
-                                                }
 
                                                 break;
 
@@ -315,34 +307,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu){
-        getMenuInflater().inflate(R.menu.main_menu, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item){
-
-            if(Build.VERSION.SDK_INT >= 23){
-                if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_ADMIN) !=
-                        PackageManager.PERMISSION_GRANTED){
-                    ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.BLUETOOTH_ADMIN}, permissionState);
-                    ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, Manifest.permission.BLUETOOTH_ADMIN);
-                }
-            }else{
-                permitted = true;
-            }
-
-            if(permitted){
-                Intent intent = new Intent(MainActivity.this, BluetoothActivity.class);
-                startActivity(intent);
-            }
-
-        return super.onOptionsItemSelected(item);
-    }
-
-
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] Permissions, int[] grantResults){
@@ -386,4 +350,32 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     };
 
 
+    private View.OnClickListener bluetoothConnect = new View.OnClickListener() {
+
+        @Override
+        public void onClick(View view) {
+
+            Log.i("Click information", "Clicked");
+            if(Build.VERSION.SDK_INT >= 23){
+                if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_ADMIN) !=
+                        PackageManager.PERMISSION_GRANTED){
+
+                    Log.i("Permission Test", "No Permission SDK > 23");
+                    ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.BLUETOOTH_ADMIN}, permissionState);
+                    ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, Manifest.permission.BLUETOOTH_ADMIN);
+                }else{
+                    permitted = true;
+                }
+            }else{
+
+                Log.i("Permission Test", "Permitted SDK < 23");
+                permitted = true;
+            }
+
+            if(permitted){
+                Intent intent = new Intent(MainActivity.this, BluetoothActivity.class);
+                startActivity(intent);
+            }
+        }
+    };
 }

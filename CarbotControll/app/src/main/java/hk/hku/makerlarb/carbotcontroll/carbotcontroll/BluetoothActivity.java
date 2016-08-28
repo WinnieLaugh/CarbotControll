@@ -47,7 +47,6 @@ public class BluetoothActivity extends FragmentActivity implements BltItemClickL
     Thread thread;
 
     BluetoothDevice deviceDestinated;
-    BluetoothDevice bluetoothDevice;
 
 
     @Override
@@ -115,7 +114,6 @@ public class BluetoothActivity extends FragmentActivity implements BltItemClickL
 
     @Override
     protected void onDestroy(){
-        thread.interrupt();
 
         unregisterReceiver(receiver);
 
