@@ -12,8 +12,6 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
@@ -36,8 +34,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private Sensor sensor;
 
     private static final int stand = 0, left = 1, right = 2, forward = 3, back = 4;
+    private static final int swing = 0, swipe = 1;
     private int state = stand;
     private int stateBefore = state;
+    private int xBefore=0, yBefore = 0, moveX = 0, moveY = 0;
     private boolean pressedState = false;
     private final static int permissionState = 0;
     private boolean permitted = false;
@@ -47,7 +47,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private ImageButton controlButton;
     private Button bluetoothButton;
+    private Button modeButton;
+    private View thisView;
     private int count = 0;
+
+    private int mode = swing;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,14 +59,22 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+
         controlButton = (ImageButton)findViewById(R.id.controlButton);
         controlButton.setOnTouchListener(controlListener);
 
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        thisView = findViewById(R.id.myView);
+
         sensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
 
         bluetoothButton = (Button)findViewById(R.id.bluetooth_connect);
         bluetoothButton.setOnClickListener(bluetoothConnect);
+
+        modeButton = (Button)findViewById(R.id.mode_button);
+        modeButton.setOnClickListener(modeChange);
+
+
 
         switchChanged();
 
@@ -155,7 +167,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     state = forward;
                 }
             }
-
 
             if (BluetoothActivity.socket != null) {
                 if (BluetoothActivity.socket.isConnected()) {
@@ -349,6 +360,167 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     };
 
+    private View.OnTouchListener swipeListener = new View.OnTouchListener(){
+
+        @Override
+        public boolean onTouch(View view, MotionEvent motionEvent) {
+
+            stateBefore = state;
+
+            switch (motionEvent.getAction()){
+                case MotionEvent.ACTION_DOWN:
+                    xBefore = (int)motionEvent.getX();
+                    yBefore = (int)motionEvent.getY();
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    moveX = (int)motionEvent.getX();
+                    moveY = (int)motionEvent.getY();
+                    break;
+                case MotionEvent.ACTION_UP:
+                    if(moveX - xBefore > 0
+                            && (Math.abs(moveX - xBefore)) > 100){
+                        Log.i("distance: ","" + (Math.abs(moveX - xBefore)));
+                        state = right;
+
+                    }else if(moveX - xBefore < 0
+                            && (Math.abs(moveX - xBefore)) > 100){
+                        Log.i("distance: ","" + (Math.abs(moveX - xBefore)));
+                        state = left;
+
+                    }else if(moveY - yBefore > 0
+                            && (Math.abs(moveY - yBefore)) > 100){
+                        Log.i("distance: ","" + (Math.abs(moveX - xBefore)));
+                        state = back;
+
+                    }else if(moveY - yBefore < 0
+                            && (Math.abs(moveY - yBefore)) > 100){
+                        Log.i("distance: ","" + (Math.abs(moveX - xBefore)));
+                        state = forward;
+
+                    }
+                    break;
+
+            }
+
+            if (BluetoothActivity.socket != null) {
+                if (BluetoothActivity.socket.isConnected()) {
+                    thread = new Thread(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            handler.postDelayed(new Runnable() {
+
+                                @Override
+                                public void run() {
+                                    try {
+                                        byte[] cmd = {'f'};
+                                        switch (state) {
+                                            case left:
+                                                for(int i = 0; i < 10; i++){
+                                                    cmd[0] = 'b';
+
+                                                    BluetoothActivity.os.write(cmd);
+                                                    BluetoothActivity.os.flush();
+
+                                                    sleep(150);
+                                                }
+
+                                                cmd[0] = 'c';
+
+                                                BluetoothActivity.os.write(cmd);
+                                                BluetoothActivity.os.flush();
+
+                                                Log.i("Direction : ", "Swipe Left");
+
+                                                break;
+
+                                            case right:
+                                                for(int i = 0; i < 10; i++){
+                                                    cmd[0] = 'd';
+
+                                                    BluetoothActivity.os.write(cmd);
+                                                    BluetoothActivity.os.flush();
+
+                                                    sleep(150);
+                                                }
+
+                                                cmd[0] = 'c';
+
+                                                BluetoothActivity.os.write(cmd);
+                                                BluetoothActivity.os.flush();
+
+                                                Log.i("Direction : ", "Swipe Right");
+
+                                                break;
+
+                                            case back:
+                                                if (stateBefore == back) {
+                                                    count++;
+                                                } else {
+                                                    count = 0;
+                                                }
+                                                if (count % 3 == 0) {
+                                                    cmd[0] = 'e';
+
+                                                    BluetoothActivity.os.write(cmd);
+                                                    BluetoothActivity.os.flush();
+
+                                                    sleep(150);
+
+                                                    BluetoothActivity.os.write(cmd);
+                                                    BluetoothActivity.os.flush();
+
+                                                    Log.i("Direction : ", "Swipe Back");
+                                                }
+                                                break;
+
+                                            case forward:
+                                                if (stateBefore == forward) {
+                                                    count++;
+                                                } else {
+                                                    count = 0;
+                                                }
+                                                if (count % 3 == 0) {
+                                                    cmd[0] = 'a';
+
+                                                    BluetoothActivity.os.write(cmd);
+                                                    BluetoothActivity.os.flush();
+
+                                                    sleep(150);
+
+                                                    BluetoothActivity.os.write(cmd);
+                                                    BluetoothActivity.os.flush();
+                                                    Log.i("Direction : ", "Swipe Forward");
+                                                }
+
+                                                break;
+
+                                        }
+
+                                    } catch (Exception e) {
+                                        Log.i("Error: ", e.toString());
+                                    }
+                                }
+                            }, 150);
+
+                        }
+                    });
+
+                }
+            }
+        if(thread.isAlive()){
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }else{
+            thread.run();
+        }
+
+            return true;
+        }
+    };
 
     private View.OnClickListener bluetoothConnect = new View.OnClickListener() {
 
@@ -360,10 +532,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_ADMIN) !=
                         PackageManager.PERMISSION_GRANTED){
 
-                    Log.i("Permission Test", "No Permission SDK > 23");
+                    Log.i("Permission Test", "No Permission, SDK > 23");
                     ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.BLUETOOTH_ADMIN}, permissionState);
                     ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, Manifest.permission.BLUETOOTH_ADMIN);
                 }else{
+                    Log.i("Permission Test", "Permitted, SDK > 23");
                     permitted = true;
                 }
             }else{
@@ -376,6 +549,42 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 Intent intent = new Intent(MainActivity.this, BluetoothActivity.class);
                 startActivity(intent);
             }
+        }
+    };
+
+    private View.OnClickListener modeChange = new View.OnClickListener(){
+
+        @Override
+        public void onClick(View view) {
+                mode = (mode + 1) % 2;
+
+            switch (mode){
+                case swing:
+                    Toast.makeText(MainActivity.this, "Changed to swing mode", Toast.LENGTH_SHORT).show();
+                    break;
+                case swipe:
+                    Toast.makeText(MainActivity.this, "Changed to swipe mode", Toast.LENGTH_SHORT).show();
+                    break;
+                default:
+                    break;
+            }
+
+            switch (mode){
+                case swing:
+                    thisView.setOnTouchListener(null);
+                    controlButton.setOnTouchListener(controlListener);
+                    sensorManager.registerListener(MainActivity.this, sensor, SensorManager.SENSOR_DELAY_NORMAL);
+                    break;
+                case swipe:
+                    sensorManager.unregisterListener(MainActivity.this);
+                    controlButton.setOnTouchListener(null);
+                    pressedState = false;
+                    thisView.setOnTouchListener(swipeListener);
+                    break;
+                default:
+                    break;
+            }
+
         }
     };
 }

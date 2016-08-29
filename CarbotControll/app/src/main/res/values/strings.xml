@@ -7,4 +7,5 @@
     <string name="bounded_devices">Bounded Devices</string>
     <string name="discovered_devices">Discovered Devices</string>
     <string name="menu_option">Bluetooth</string>
+    <string name="mode_change">Change mode</string>
 </resources>

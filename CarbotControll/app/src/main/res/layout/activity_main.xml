@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/myView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:paddingTop="@dimen/activity_vertical_margin"
@@ -9,15 +10,13 @@
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:orientation="vertical">
 
-
     <GridLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:useDefaultMargins="true"
         android:layout_marginTop="@dimen/text_margin"
         android:orientation="horizontal"
         android:rowCount="1"
-        android:columnCount="3">
+        android:columnCount="4">
 
         <Button
             android:id="@+id/bluetooth_connect"
@@ -25,7 +24,17 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/menu_option"
+            android:textAllCaps="false"
             android:textColor="#4871A8" />
+
+        <Button
+            android:id="@+id/mode_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/mode_change"
+            android:textAllCaps="false"
+            android:textColor="#4871A8"
+            />
 
         <TextView
             android:layout_width="wrap_content"
@@ -60,7 +69,6 @@
             android:elevation="5dp"/>
 
     </FrameLayout>
-
 
 
 </LinearLayout>
