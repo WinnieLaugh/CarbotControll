@@ -59,22 +59,24 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-
+        //set the listener for the control button in the center,
         controlButton = (ImageButton)findViewById(R.id.controlButton);
         controlButton.setOnTouchListener(controlListener);
 
+        //set the listener for the view for the swipe mode
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         thisView = findViewById(R.id.myView);
 
+        //get the sensor manager
         sensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
 
+        //set the listener for the bluetooth connect button
         bluetoothButton = (Button)findViewById(R.id.bluetooth_connect);
         bluetoothButton.setOnClickListener(bluetoothConnect);
 
+        //set listener for the mode-choose button
         modeButton = (Button)findViewById(R.id.mode_button);
         modeButton.setOnClickListener(modeChange);
-
-
 
         switchChanged();
 
@@ -82,10 +84,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     @Override
     protected void onDestroy() {
+
+        //unregister the sensor listener before destroy the activity
         sensorManager.unregisterListener(this);
 
         if (BluetoothActivity.socket.isConnected()) {
             try {
+                //close the socket
                 BluetoothActivity.socket.close();
             } catch (IOException e) {
 
@@ -100,6 +105,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onRestart();
     }
 
+    //set the whether or not to use the mobile phone to control
     public void switchChanged() {
 
         final Switch controlSwitch = (Switch) findViewById(R.id.switch_button);
@@ -143,6 +149,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     }
 
+    //register the sensor after all things resumed
     @Override
     protected void onPostResume() {
 
@@ -151,9 +158,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
 
+    //while in sway mode, test the state and send commands
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
 
+        //the sway mode is only functional if the control button in the center is pressed
+        //value[0] > 0 if the right side of the phone is lifted higher than the left side
+        //and it is quite sensitive so I made the boundary 2
+        //value[0] < 0 if the left side of the phone is lifted higher than the right side
+        //value[1] > 0 if the up side of the phone is lifted (the screen of the phone is facing yourself)
+        //value[1] < 0 if the down side of the phone is lifted(the screen of the phone is facing outside)
         if(pressedState){
             stateBefore = state;
             if (sensorEvent.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
@@ -168,6 +182,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 }
             }
 
+            //send the commands according to the state
             if (BluetoothActivity.socket != null) {
                 if (BluetoothActivity.socket.isConnected()) {
                     thread = new Thread(new Runnable() {
@@ -182,69 +197,56 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                                         byte[] cmd = {'f'};
                                         switch (state) {
                                             case left:
-                                                    cmd[0] = 'b';
+                                                cmd[0] = 'b';
 
-                                                    BluetoothActivity.os.write(cmd);
-                                                    BluetoothActivity.os.flush();
+                                                //send the commands by the output stream of the socket
+                                                BluetoothActivity.os.write(cmd);
+                                                BluetoothActivity.os.flush();
 
-                                                    sleep(150);
+                                                //if the commands are sent too fast, the car can not get that, it have to rest for some time here
+                                                sleep(150);
 
-                                                    Log.i("Direction : ", "Left");
+                                                Log.i("Direction : ", "Left");
 
                                                 break;
 
                                             case right:
+                                                cmd[0] = 'd';
 
-                                                    cmd[0] = 'd';
+                                                BluetoothActivity.os.write(cmd);
+                                                BluetoothActivity.os.flush();
 
-                                                    BluetoothActivity.os.write(cmd);
-                                                    BluetoothActivity.os.flush();
+                                                sleep(150);
 
-                                                    sleep(150);
-
-                                                    Log.i("Direction : ", "Right");
+                                                Log.i("Direction : ", "Right");
 
                                                 break;
 
                                             case back:
-                                                if(stateBefore == right){
-                                                    count ++;
-                                                }else{
-                                                    count = 0;
-                                                }
-                                                if(count % 3 == 0){
-                                                    cmd[0] = 'e';
+                                                cmd[0] = 'e';
 
-                                                    BluetoothActivity.os.write(cmd);
-                                                    BluetoothActivity.os.flush();
+                                                BluetoothActivity.os.write(cmd);
+                                                BluetoothActivity.os.flush();
 
-                                                    sleep(150);
+                                                sleep(150);
 
-                                                    BluetoothActivity.os.write(cmd);
-                                                    BluetoothActivity.os.flush();
+                                                BluetoothActivity.os.write(cmd);
+                                                BluetoothActivity.os.flush();
 
-                                                    Log.i("Direction : ", "Back");
-                                                }
+                                                Log.i("Direction : ", "Back");
                                                 break;
 
                                             case forward:
-                                                if(stateBefore == right){
-                                                    count ++;
-                                                }else{
-                                                    count = 0;
-                                                }
-                                                if(count % 3 == 0){
-                                                    cmd[0] = 'a';
+                                                cmd[0] = 'a';
 
-                                                    BluetoothActivity.os.write(cmd);
-                                                    BluetoothActivity.os.flush();
+                                                BluetoothActivity.os.write(cmd);
+                                                BluetoothActivity.os.flush();
 
-                                                    sleep(150);
+                                                sleep(150);
 
-                                                    BluetoothActivity.os.write(cmd);
-                                                    BluetoothActivity.os.flush();
-                                                    Log.i("Direction : ", "Forward");
-                                                }
+                                                BluetoothActivity.os.write(cmd);
+                                                BluetoothActivity.os.flush();
+                                                Log.i("Direction : ", "Forward");
 
                                                 break;
 
@@ -275,6 +277,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                                     @Override
                                     public void run() {
+                                        //you just have to send the stand command once
                                         if(stateBefore != stand){
                                         try {
                                             count = 0;
@@ -300,6 +303,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             }
         }
 
+        //if the thread is running ,wait for it ends, it not, run the thread
         if(thread.isAlive()){
             try {
                 thread.join();
@@ -319,6 +323,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
 
+    //if the SDK is newer than SDK 23, this method has to be called to request the permission
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] Permissions, int[] grantResults){
         switch(requestCode){
@@ -343,6 +348,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
 
+    //the control listener for the control button in the center
     private View.OnTouchListener controlListener = new View.OnTouchListener() {
 
         @Override
@@ -360,6 +366,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     };
 
+    //the swipe button for the view of the swipe mode
     private View.OnTouchListener swipeListener = new View.OnTouchListener(){
 
         @Override
@@ -368,6 +375,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             stateBefore = state;
 
             switch (motionEvent.getAction()){
+                //if you pressed down on the view, get the x, y and use it to calculate the gesture
                 case MotionEvent.ACTION_DOWN:
                     xBefore = (int)motionEvent.getX();
                     yBefore = (int)motionEvent.getY();
@@ -402,6 +410,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
             }
 
+            //send the commands
             if (BluetoothActivity.socket != null) {
                 if (BluetoothActivity.socket.isConnected()) {
                     thread = new Thread(new Runnable() {
@@ -416,7 +425,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                                         byte[] cmd = {'f'};
                                         switch (state) {
                                             case left:
-                                                for(int i = 0; i < 10; i++){
+                                                for(int i = 0; i < 5; i++){
                                                     cmd[0] = 'b';
 
                                                     BluetoothActivity.os.write(cmd);
@@ -435,7 +444,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                                                 break;
 
                                             case right:
-                                                for(int i = 0; i < 10; i++){
+                                                for(int i = 0; i < 5; i++){
                                                     cmd[0] = 'd';
 
                                                     BluetoothActivity.os.write(cmd);
@@ -443,8 +452,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                                                     sleep(150);
                                                 }
-
-                                                cmd[0] = 'c';
 
                                                 BluetoothActivity.os.write(cmd);
                                                 BluetoothActivity.os.flush();
@@ -454,12 +461,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                                                 break;
 
                                             case back:
-                                                if (stateBefore == back) {
-                                                    count++;
-                                                } else {
-                                                    count = 0;
-                                                }
-                                                if (count % 3 == 0) {
                                                     cmd[0] = 'e';
 
                                                     BluetoothActivity.os.write(cmd);
@@ -471,16 +472,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                                                     BluetoothActivity.os.flush();
 
                                                     Log.i("Direction : ", "Swipe Back");
-                                                }
                                                 break;
 
                                             case forward:
-                                                if (stateBefore == forward) {
-                                                    count++;
-                                                } else {
-                                                    count = 0;
-                                                }
-                                                if (count % 3 == 0) {
                                                     cmd[0] = 'a';
 
                                                     BluetoothActivity.os.write(cmd);
@@ -491,7 +485,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                                                     BluetoothActivity.os.write(cmd);
                                                     BluetoothActivity.os.flush();
                                                     Log.i("Direction : ", "Swipe Forward");
-                                                }
 
                                                 break;
 
@@ -532,6 +525,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_ADMIN) !=
                         PackageManager.PERMISSION_GRANTED){
 
+                    //if the SDk is higher than 23, and the permission is not granted
                     Log.i("Permission Test", "No Permission, SDK > 23");
                     ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.BLUETOOTH_ADMIN}, permissionState);
                     ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, Manifest.permission.BLUETOOTH_ADMIN);
@@ -545,6 +539,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 permitted = true;
             }
 
+            //start the bluetooth activity if  the permission is got
             if(permitted){
                 Intent intent = new Intent(MainActivity.this, BluetoothActivity.class);
                 startActivity(intent);
@@ -569,6 +564,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     break;
             }
 
+            //register or unregister the listener
             switch (mode){
                 case swing:
                     thisView.setOnTouchListener(null);

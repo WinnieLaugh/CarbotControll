@@ -60,6 +60,9 @@ public class BluetoothActivity extends FragmentActivity implements BltItemClickL
         enableBluetooth();
 
         discoveredView.setLayoutManager(new LinearLayoutManager(this));
+
+        //use the receiver to get the discovered devices
+        //only the bounded device which is also discovered will be presented
         receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -123,7 +126,8 @@ public class BluetoothActivity extends FragmentActivity implements BltItemClickL
 
     }
 
-
+    //get the bounded devices and show them on the upper list view
+    //only the bounded devices which is also discovered will be presented in the discovered list
     private void enableBluetooth(){
         if(!bluetoothAdapter.isEnabled()){
             bluetoothAdapter.enable();
@@ -148,6 +152,7 @@ public class BluetoothActivity extends FragmentActivity implements BltItemClickL
     }
 
 
+    //try to connect the device selected
     @Override
     public void OnItemClick(View view, final int position) {
 
