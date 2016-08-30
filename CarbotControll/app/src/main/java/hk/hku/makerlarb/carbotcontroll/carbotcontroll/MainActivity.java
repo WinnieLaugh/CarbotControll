@@ -171,9 +171,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if(pressedState){
             stateBefore = state;
             if (sensorEvent.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-                if (sensorEvent.values[0] > 2) {
+                if (sensorEvent.values[0] > 3) {
                     state = left;
-                } else if (sensorEvent.values[0] < -2) {
+                } else if (sensorEvent.values[0] < -3) {
                     state = right;
                 } else if (sensorEvent.values[1] > 1) {
                     state = back;
@@ -425,14 +425,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                                         byte[] cmd = {'f'};
                                         switch (state) {
                                             case left:
-                                                for(int i = 0; i < 5; i++){
-                                                    cmd[0] = 'b';
+                                                cmd[0] = 'b';
 
-                                                    BluetoothActivity.os.write(cmd);
-                                                    BluetoothActivity.os.flush();
+                                                BluetoothActivity.os.write(cmd);
+                                                BluetoothActivity.os.flush();
 
-                                                    sleep(150);
-                                                }
+                                                sleep(150);
 
                                                 cmd[0] = 'c';
 
@@ -444,14 +442,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                                                 break;
 
                                             case right:
-                                                for(int i = 0; i < 5; i++){
-                                                    cmd[0] = 'd';
+                                                cmd[0] = 'd';
 
-                                                    BluetoothActivity.os.write(cmd);
-                                                    BluetoothActivity.os.flush();
+                                                BluetoothActivity.os.write(cmd);
+                                                BluetoothActivity.os.flush();
 
-                                                    sleep(150);
-                                                }
+                                                sleep(150);
+
 
                                                 BluetoothActivity.os.write(cmd);
                                                 BluetoothActivity.os.flush();
@@ -576,6 +573,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     controlButton.setOnTouchListener(null);
                     pressedState = false;
                     thisView.setOnTouchListener(swipeListener);
+                    controlButton.setOnClickListener(stopListener);
                     break;
                 default:
                     break;
@@ -583,4 +581,55 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         }
     };
+
+    private View.OnClickListener stopListener = new View.OnClickListener(){
+
+        @Override
+        public void onClick(View view) {
+            if (BluetoothActivity.socket != null) {
+                if (BluetoothActivity.socket.isConnected()) {
+
+                    thread = new Thread(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            handler.postDelayed(new Runnable() {
+
+                                @Override
+                                public void run() {
+                                    //you just have to send the stand command once
+                                        try {
+                                            count = 0;
+                                            byte[] cmd = {'c'};
+                                            BluetoothActivity.os.write(cmd);
+                                            BluetoothActivity.os.flush();
+
+                                            sleep(150);
+
+                                            Log.i("Direction : ", "Stand");
+
+                                            stateBefore =  stand;
+                                        } catch (Exception e) {
+                                            Log.i("Error: ", e.toString());
+                                        }
+                                    }
+                            }, 150);
+                        }
+                    });
+
+                }
+            }
+            if(thread.isAlive()){
+                try {
+                    thread.join();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }else{
+                thread.run();
+            }
+
+        }
+    };
+
 }
